@@ -135,10 +135,39 @@ function loadExistingIds(sheet) {
   return ids;
 }
 
+/**
+ * Normalize a date-like value to YYYY-MM-DD for the MLB Stats API.
+ * Accepts Date objects or strings (including long timezone strings from Sheets).
+ */
+function normalizeDateForApi(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, 'UTC', 'yyyy-MM-dd');
+  }
+  const str = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  // Attempt to parse other string formats (e.g., "Fri Nov 01 2024 00:00:00 GMT-0400 ...")
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return Utilities.formatDate(parsed, 'UTC', 'yyyy-MM-dd');
+  }
+  // Fallback to default if parsing fails; caller should supply sane defaults
+  return str;
+}
+
 function getDateRange(metaSheet) {
   const map = readKeyValueMap(metaSheet);
-  const startDate = map['startDate'] || DEFAULT_START;
-  const endDate = map['endDate'] || DEFAULT_END;
+  const startDate = normalizeDateForApi(map['startDate'] || DEFAULT_START);
+  const endDate = normalizeDateForApi(map['endDate'] || DEFAULT_END);
+
+  // Basic validation to prevent MLB API 400 errors
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    throw new Error(`Invalid startDate: ${startDate}. Expected YYYY-MM-DD`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    throw new Error(`Invalid endDate: ${endDate}. Expected YYYY-MM-DD`);
+  }
   return { startDate, endDate };
 }
 
